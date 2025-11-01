@@ -1,18 +1,76 @@
 import { useState, useEffect } from "react";
 import { CreditCard, Plus, Search, Upload } from "lucide-react";
 import assets from "../assets/assets";
+import { useWeb3 } from "../contexts/Web3Context";
+import { api } from "../services/api";
 
 const EFYCard = () => {
-  const [balance] = useState(782.00);
+  const { account } = useWeb3();
+  const [balance, setBalance] = useState(0);
   const [selectedLinkedCard, setSelectedLinkedCard] = useState(null);
   const [isAddingCVV, setIsAddingCVV] = useState(false);
   const [showFileSearch, setShowFileSearch] = useState(false);
   const [sortBy, setSortBy] = useState("transaction");
+  const [linkedCards, setLinkedCards] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const linkedCards = [
-    { id: 1, type: "VISA", lastFour: "+1343", amount: 110.00 },
-    { id: 2, type: "VISA", lastFour: "+1343", amount: 110.00 },
-  ];
+  useEffect(() => {
+    if (account) {
+      fetchEFYData();
+    } else {
+      setLoading(false);
+    }
+  }, [account]);
+
+  const fetchEFYData = async () => {
+    setLoading(true);
+    try {
+      if (account) {
+        const userResponse = await api.getUser(account);
+        const pools = userResponse.user?.joinedPools || [];
+        
+        // Calculate total pending/completed pool investments
+        let totalBalance = 0;
+        const cardData = [];
+        
+        pools.forEach((pool, index) => {
+          const contribution = parseFloat(pool.userContribution || pool.amount || 0);
+          if (contribution > 0) {
+            totalBalance += contribution;
+            
+            // Create card entries for active pools
+            if (pool.status === 'open' || pool.status === 'active') {
+              cardData.push({
+                id: index + 1,
+                type: pool.coinType || 'POOL',
+                lastFour: pool.name?.slice(-4) || pool._id?.slice(-4) || '0000',
+                amount: contribution
+              });
+            }
+          }
+        });
+        
+        // If no pools, show default cards
+        if (cardData.length === 0) {
+          cardData.push(
+            { id: 1, type: "POOL", lastFour: "0000", amount: 0 },
+            { id: 2, type: "POOL", lastFour: "0000", amount: 0 }
+          );
+        }
+        
+        setLinkedCards(cardData);
+        setBalance(totalBalance);
+      }
+    } catch (error) {
+      console.error('Error fetching EFY data:', error);
+      setLinkedCards([
+        { id: 1, type: "POOL", lastFour: "0000", amount: 0 },
+        { id: 2, type: "POOL", lastFour: "0000", amount: 0 }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -127,7 +185,7 @@ const EFYCard = () => {
 
         <div className="bg-gradient-to-br from-[#f5c755]/20 to-[#f5c755]/5 rounded-2xl p-3 sm:p-4 mb-3 sm:mb-4 transition-all duration-500 group-hover:from-[#f5c755]/30 group-hover:to-[#f5c755]/10 animate-slide-in-left delay-100">
           <p className="text-2xl sm:text-3xl font-bold text-[#f5c755] mb-3 sm:mb-4 transition-all duration-300 group-hover:scale-105 group-hover:text-accent-foreground animate-scale-in delay-200">
-            {formatAmount(balance)}
+            {loading ? 'Loading...' : formatAmount(balance)}
           </p>
 
         

@@ -1,13 +1,34 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "../components/sidebar";
 import BalanceCard from "../components/BalanceCards";
 import TransactionsCard from "../components/Transactions";
 import EFYCard from "../components/EFY";
 import WalletCard from "../components/walletCard";
 import { Menu, X } from "lucide-react";
+import { useWeb3 } from "../contexts/Web3Context";
+import { api } from "../services/api";
 
 const WalletPage = () => {
+  const { account } = useWeb3();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userName, setUserName] = useState("User");
+
+  useEffect(() => {
+    if (account) {
+      fetchUserName();
+    }
+  }, [account]);
+
+  const fetchUserName = async () => {
+    try {
+      const response = await api.getUser(account);
+      if (response.user?.userName) {
+        setUserName(response.user.userName);
+      }
+    } catch (error) {
+      console.error('Error fetching user name:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-black text-white">
@@ -42,7 +63,7 @@ const WalletPage = () => {
 
           {/* Header text */}
           <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-yellow-400 via-yellow-200 to-white bg-clip-text text-transparent">
-            Welcome Sandra !
+            Welcome {userName}{account ? ' !' : ' - Please connect wallet'}
           </h1>
         </div>
 

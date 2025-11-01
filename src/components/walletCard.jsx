@@ -1,16 +1,118 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import assets from "../assets/assets";
+import { useWeb3 } from "../contexts/Web3Context";
+import { api } from "../services/api";
+import { ethers } from "ethers";
 
 const WalletCard = () => {
+  const { account, provider } = useWeb3();
   const [selectedWallet, setSelectedWallet] = useState(null);
-  const [totalBalance] = useState(82326.21);
+  const [wallets, setWallets] = useState([]);
+  const [totalBalance, setTotalBalance] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const wallets = [
-    { id: 1, name: "BTC", amount: 33300, color: "bg-orange-500" },
-    { id: 2, name: "BTC", amount: 5108, color: "bg-orange-500" },
-    { id: 3, name: "ETH", amount: 1900, color: "bg-blue-500" },
-    { id: 5, name: "USDC", amount: 700, color: "bg-blue-400" },
-  ];
+  useEffect(() => {
+    if (account) {
+      fetchWalletData();
+    } else {
+      setLoading(false);
+    }
+  }, [account, provider]);
+
+  const fetchWalletData = async () => {
+    setLoading(true);
+    try {
+      const walletData = [];
+      let total = 0;
+
+      // Fetch ETH balance
+      if (provider && account) {
+        try {
+          const ethBalance = await provider.getBalance(account);
+          const ethAmount = parseFloat(ethers.formatEther(ethBalance));
+          
+          if (ethAmount > 0) {
+            const ethPriceResponse = await api.getPrice('eth');
+            const ethPrice = ethPriceResponse.priceUSD || 2700;
+            const ethValue = ethAmount * ethPrice;
+            
+            walletData.push({
+              id: 1,
+              name: "ETH",
+              amount: ethValue,
+              color: "bg-blue-500"
+            });
+            total += ethValue;
+          }
+        } catch (error) {
+          console.error('Error fetching ETH balance:', error);
+        }
+      }
+
+      // Fetch user pools to calculate BTC and other investments
+      if (account) {
+        try {
+          const userResponse = await api.getUser(account);
+          const pools = userResponse.user?.joinedPools || [];
+          
+          // Get BTC price
+          const btcPriceResponse = await api.getPrice('btc');
+          const btcPrice = btcPriceResponse.priceUSD || 68350;
+          
+          // Group by coin type
+          const coinGroups = {};
+          pools.forEach(pool => {
+            const coinType = pool.coinType || 'BTC';
+            const contribution = parseFloat(pool.userContribution || pool.amount || 0);
+            
+            if (contribution > 0) {
+              if (!coinGroups[coinType]) {
+                coinGroups[coinType] = 0;
+              }
+              coinGroups[coinType] += contribution;
+            }
+          });
+          
+          // Convert to wallet format
+          Object.entries(coinGroups).forEach(([coinType, amount], index) => {
+            const colors = {
+              'BTC': 'bg-orange-500',
+              'ETH': 'bg-blue-500',
+              'USDC': 'bg-blue-400',
+              'USDT': 'bg-green-500'
+            };
+            
+            walletData.push({
+              id: walletData.length + 1,
+              name: coinType,
+              amount: amount,
+              color: colors[coinType] || 'bg-purple-500'
+            });
+            total += amount;
+          });
+        } catch (error) {
+          console.error('Error fetching user pools:', error);
+        }
+      }
+
+      // If no wallets, show empty state
+      if (walletData.length === 0) {
+        walletData.push({
+          id: 1,
+          name: "No Assets",
+          amount: 0,
+          color: "bg-gray-500"
+        });
+      }
+
+      setWallets(walletData);
+      setTotalBalance(total);
+    } catch (error) {
+      console.error('Error fetching wallet data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatAmount = (amount) => {
     return new Intl.NumberFormat("en-US", {
@@ -53,7 +155,7 @@ const WalletCard = () => {
             </h3>
             <p className="text-xs sm:text-sm text-muted-foreground transition-colors duration-300 group-hover:text-[#f5c755]">
               Balance money: <span className="text-[#f5c755] font-medium transition-colors duration-300 group-hover:text-accent-foreground">
-                {formatAmount(totalBalance)}
+                {loading ? 'Loading...' : formatAmount(totalBalance)}
               </span>
             </p>
           </div>

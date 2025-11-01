@@ -1,30 +1,121 @@
 import { useState, useEffect } from "react";
-
+import { useWeb3 } from "../contexts/Web3Context";
+import { api } from "../services/api";
+import { ethers } from "ethers";
 import assets from "../assets/assets";
+
 const circumference = 2 * Math.PI * 40;
-  const seg = circumference / 3;
+const seg = circumference / 3;
 
 const BalanceCard = () => {
-  const [balance] = useState(3431.37);
-  const [progress, setProgress] = useState(0);
+  const { account, provider } = useWeb3();
+  const [balance, setBalance] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [cryptos, setCryptos] = useState([
+    { name: "0%", image: assets.Icon3, id: "btc", amount: 0 },
+    { name: "0%", image: assets.Icon2, id: "eth", amount: 0 },
+    { name: "0%", image: assets.Icon1, id: "usdc", amount: 0 },
+  ]);
   const [hoveredCrypto, setHoveredCrypto] = useState(null);
-   
-
 
   useEffect(() => {
-    setTimeout(() => {
-      setProgress(0.75);
-    }, 500);
-  }, []);
+    if (account) {
+      fetchBalanceData();
+    } else {
+      setLoading(false);
+    }
+  }, [account, provider]);
 
-  const circumference = 251.2;
-  const strokeDashoffset = circumference * (1 - progress);
+  const fetchBalanceData = async () => {
+    setLoading(true);
+    try {
+      let totalUSD = 0;
+      const cryptoData = [];
 
-  const cryptos = [
-    { name: "38%", image: assets.Icon3, id: "btc" },
-    { name: "19%", image: assets.Icon2, id: "eth" },
-    { name: "25%", image: assets.Icon1, id: "dash" },
-  ];
+      // Fetch ETH balance
+      if (provider && account) {
+        try {
+          const ethBalance = await provider.getBalance(account);
+          const ethAmount = parseFloat(ethers.formatEther(ethBalance));
+          
+          // Fetch ETH price
+          const ethPriceResponse = await api.getPrice('eth');
+          const ethPrice = ethPriceResponse.priceUSD || 2700;
+          const ethValue = ethAmount * ethPrice;
+          
+          if (ethValue > 0) {
+            cryptoData.push({
+              name: `${ethAmount.toFixed(4)} ETH`,
+              image: assets.Icon2,
+              id: "eth",
+              amount: ethValue
+            });
+            totalUSD += ethValue;
+          }
+        } catch (error) {
+          console.error('Error fetching ETH balance:', error);
+        }
+      }
+
+      // Fetch user pools and calculate BTC investments
+      if (account) {
+        try {
+          const userResponse = await api.getUser(account);
+          const pools = userResponse.user?.joinedPools || [];
+          
+          // Fetch BTC price
+          const btcPriceResponse = await api.getPrice('btc');
+          const btcPrice = btcPriceResponse.priceUSD || 68350;
+          
+          let totalBTCValue = 0;
+          pools.forEach(pool => {
+            if (pool.coinType === 'BTC' && pool.userContribution) {
+              totalBTCValue += parseFloat(pool.userContribution) || 0;
+            }
+          });
+          
+          if (totalBTCValue > 0) {
+            cryptoData.push({
+              name: `${(totalBTCValue / btcPrice).toFixed(4)} BTC`,
+              image: assets.Icon3,
+              id: "btc",
+              amount: totalBTCValue
+            });
+            totalUSD += totalBTCValue;
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      }
+
+      // Calculate percentages and format
+      const formattedCryptos = cryptoData.map(crypto => ({
+        ...crypto,
+        name: totalUSD > 0 ? `${((crypto.amount / totalUSD) * 100).toFixed(0)}%` : "0%"
+      }));
+
+      // If no data, show placeholder
+      if (formattedCryptos.length === 0) {
+        formattedCryptos.push(
+          { name: "0%", image: assets.Icon3, id: "btc", amount: 0 },
+          { name: "0%", image: assets.Icon2, id: "eth", amount: 0 },
+          { name: "0%", image: assets.Icon1, id: "usdc", amount: 0 }
+        );
+      }
+
+      setCryptos(formattedCryptos);
+      setBalance(totalUSD);
+    } catch (error) {
+      console.error('Error fetching balance data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const circumferenceChart = 251.2;
+  const totalCryptoAmount = cryptos.reduce((sum, c) => sum + c.amount, 0);
+  const progress = balance > 0 ? Math.min(totalCryptoAmount / balance, 1) : 0;
+  const strokeDashoffset = circumferenceChart * (1 - progress);
 
   const handleCryptoHover = (id) => setHoveredCrypto(id);
 
@@ -112,7 +203,7 @@ const BalanceCard = () => {
               Total Balance
             </p>
             <h2 className="text-3xl sm:text-4xl font-bold text-accent group-hover:text-accent-foreground transition-all duration-500 ease-out animate-scale-in delay-200">
-              ${balance.toFixed(2)}
+              {loading ? 'Loading...' : `$${balance.toFixed(2)}`}
             </h2>
           </div>
 
@@ -123,6 +214,7 @@ const BalanceCard = () => {
                          flex items-center justify-center hover:bg-muted transition-all duration-300 ease-out 
                          hover:scale-110 hover:rotate-12 group-hover:animate-bounce-subtle flex-1 sm:flex-none
                          animate-pulse-hover"
+              onClick={fetchBalanceData}
             >
               <img
                 src={assets.Refresh}

@@ -4,6 +4,10 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/sidebar';
 import BitcoinLogo from '../assets/Bitcoin.png';
 import EthereumLogo from '../assets/Ethereum.png';
+import TetherLogo from '../assets/Tether.png';
+import CardanoLogo from '../assets/Cardano.png';
+import BinanceLogo from '../assets/Binance.png';
+import XRRLogo from '../assets/XRR.png';
 import { ChevronDown, Tv, Menu, X } from 'lucide-react';
 import { api } from '../services/api';
 import { useWeb3 } from '../contexts/Web3Context';
@@ -23,6 +27,35 @@ const coinsConfig = [
     apiSymbol: 'eth',
     logo: EthereumLogo,
   },
+  {
+    rank: 3,
+    name: 'Tether',
+    symbol: 'USDT',
+    apiSymbol: 'usdt',
+    logo: TetherLogo,
+    fallbackPrice: 1.0, // Stablecoin, usually $1
+  },
+  {
+    rank: 4,
+    name: 'Binance Coin',
+    symbol: 'BNB',
+    apiSymbol: 'bnb',
+    logo: BinanceLogo,
+  },
+  {
+    rank: 5,
+    name: 'XRP',
+    symbol: 'XRP',
+    apiSymbol: 'xrp',
+    logo: XRRLogo,
+  },
+  {
+    rank: 6,
+    name: 'Cardano',
+    symbol: 'ADA',
+    apiSymbol: 'ada',
+    logo: CardanoLogo,
+  },
 ];
 
 export default function Market() {
@@ -31,29 +64,81 @@ export default function Market() {
   const [coins, setCoins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [prevPrices, setPrevPrices] = useState({});
+  const [userData, setUserData] = useState(null);
 
   useEffect(() => {
     fetchCoinPrices();
+    if (account) {
+      fetchUserData();
+    }
     // Refresh prices every 30 seconds
     const interval = setInterval(fetchCoinPrices, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [account]);
+
+  const fetchUserData = async () => {
+    if (!account) return;
+    try {
+      const response = await api.getUser(account);
+      setUserData(response.user);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
 
   const fetchCoinPrices = async () => {
     setLoading(true);
     try {
       const coinDataPromises = coinsConfig.map(async (coinConfig) => {
+        // Only fetch prices for BTC and ETH (supported by backend)
+        // For other coins, use fallback or show N/A
+        if (coinConfig.apiSymbol !== 'btc' && coinConfig.apiSymbol !== 'eth' && !coinConfig.fallbackPrice) {
+          return {
+            ...coinConfig,
+            price: 'N/A',
+            change24h: 'N/A',
+            priceUSD: 0,
+            marketCap: 'N/A',
+            volume: 'N/A',
+          };
+        }
+
         try {
           const response = await api.getPrice(coinConfig.apiSymbol);
-          const priceUSD = response.priceUSD || 0;
-          const prevPrice = prevPrices[coinConfig.symbol] || priceUSD;
+          console.log(`Price response for ${coinConfig.name} (${coinConfig.apiSymbol}):`, response);
           
-          // Calculate 24h change (simplified - in production, backend should provide this)
-          const change = prevPrice > 0 ? ((priceUSD - prevPrice) / prevPrice) * 100 : 0;
-          const change24h = change >= 0 ? `+${change.toFixed(2)}%` : `${change.toFixed(2)}%`;
+          // Check if response has error
+          if (response.error) {
+            console.warn(`API returned error for ${coinConfig.name}:`, response.error);
+            throw new Error(response.error);
+          }
           
-          // Store current price for next calculation
-          setPrevPrices(prev => ({ ...prev, [coinConfig.symbol]: priceUSD }));
+          // Extract price from response - backend should return { coin, priceUSD, source }
+          let priceUSD = response.priceUSD || response.price || 0;
+          
+          // Validate price is a number
+          if (typeof priceUSD !== 'number' || isNaN(priceUSD) || priceUSD <= 0) {
+            console.warn(`Invalid price for ${coinConfig.name}:`, priceUSD);
+            throw new Error(`Invalid price: ${priceUSD}`);
+          }
+          
+          // Only calculate change if we have a valid price
+          // Note: Backend doesn't provide 24h change, so we'll show 0% initially
+          // In production, backend should provide priceChange24h field
+          let change24h = '0.00%';
+          if (priceUSD > 0) {
+            const prevPrice = prevPrices[coinConfig.symbol];
+            if (prevPrice && prevPrice > 0 && prevPrice !== priceUSD) {
+              const change = ((priceUSD - prevPrice) / prevPrice) * 100;
+              change24h = change >= 0 ? `+${change.toFixed(2)}%` : `${change.toFixed(2)}%`;
+            } else {
+              // First time loading - show 0%
+              change24h = '0.00%';
+            }
+            
+            // Store current price for next calculation
+            setPrevPrices(prev => ({ ...prev, [coinConfig.symbol]: priceUSD }));
+          }
           
           return {
             ...coinConfig,
@@ -65,10 +150,21 @@ export default function Market() {
           };
         } catch (error) {
           console.error(`Error fetching ${coinConfig.name} price:`, error);
+          console.error(`Full error details:`, {
+            message: error.message,
+            stack: error.stack,
+            coin: coinConfig.apiSymbol
+          });
+          
+          // Use fallback if available
+          const fallbackPrice = coinConfig.fallbackPrice || 0;
           return {
             ...coinConfig,
-            price: 'N/A',
-            change24h: '0%',
+            price: fallbackPrice > 0 
+              ? `$${fallbackPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : 'N/A',
+            change24h: 'N/A',
+            priceUSD: fallbackPrice,
             marketCap: 'N/A',
             volume: 'N/A',
           };
@@ -123,11 +219,15 @@ export default function Market() {
           {/* Right: Profile button */}
           <div className="flex items-center bg-black px-4 py-1 rounded-full border border-yellow-500/50">
             <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-black font-bold text-sm mr-3">
-              B
+              {userData?.userName ? userData.userName.charAt(0).toUpperCase() : account ? account.charAt(2).toUpperCase() : 'G'}
             </div>
             <div>
-              <div className="text-sm font-medium">Big McDonalds</div>
-              <div className="text-xs text-gray-500">13th/03/2027</div>
+              <div className="text-sm font-medium">
+                {userData?.userName || (account ? 'Guest' : 'Connect Wallet')}
+              </div>
+              <div className="text-xs text-gray-500">
+                {account ? `${account.slice(0, 6)}...${account.slice(-4)}` : 'Not connected'}
+              </div>
             </div>
             <ChevronDown className="w-4 h-4 text-yellow-500 ml-3" />
           </div>
@@ -152,7 +252,7 @@ export default function Market() {
                   <span className="text-sm text-gray-400">{coin.name}</span>
                 </div>
                 <div className="text-xl font-bold">{coin.price}</div>
-                <div className={`text-sm ${coin.change24h.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
+                <div className={`text-sm ${coin.change24h && coin.change24h !== 'N/A' && coin.change24h.startsWith('+') ? 'text-green-500' : coin.change24h && coin.change24h !== 'N/A' && !coin.change24h.startsWith('+') ? 'text-red-500' : 'text-gray-500'}`}>
                   {coin.change24h}
                 </div>
               </div>
@@ -190,7 +290,11 @@ export default function Market() {
                     <td className="p-3 font-medium">{coin.price}</td>
                     <td
                       className={`p-3 text-sm ${
-                        coin.change24h.startsWith('+') ? 'text-green-500' : 'text-red-500'
+                        coin.change24h && coin.change24h !== 'N/A' && coin.change24h.startsWith('+') 
+                          ? 'text-green-500' 
+                          : coin.change24h && coin.change24h !== 'N/A' && !coin.change24h.startsWith('+')
+                          ? 'text-red-500'
+                          : 'text-gray-500'
                       }`}
                     >
                       {coin.change24h}

@@ -1,9 +1,11 @@
 'use client';
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import assets from "../assets/assets";
 import Sidebar from "../components/sidebar";
 import { useNavigate } from "react-router-dom";
 import { Menu } from "lucide-react";
+import { useWeb3 } from "../contexts/Web3Context";
+import { api } from "../services/api";
 
 const poolsTop = [
   {
@@ -66,8 +68,26 @@ const Card = ({ name, by, members, desc, compact = false }) => {
 };
 
 const PoolPage = () => {
+  const { account } = useWeb3();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userData, setUserData] = useState(null);
+
+  useEffect(() => {
+    if (account) {
+      fetchUserData();
+    }
+  }, [account]);
+
+  const fetchUserData = async () => {
+    if (!account) return;
+    try {
+      const response = await api.getUser(account);
+      setUserData(response.user);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-black text-white font-poppins flex flex-col md:flex-row transition-all duration-300">
@@ -96,17 +116,15 @@ const PoolPage = () => {
             POOL MANAGEMENT
           </div>
           <div className="flex items-center gap-3">
-            <img
-              src={assets.profile}
-              alt="Profile"
-              className="w-10 h-10 rounded-full object-cover border border-yellow-600/60"
-            />
+            <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center text-black font-bold border border-yellow-600/60">
+              {userData?.userName ? userData.userName.charAt(0).toUpperCase() : account ? account.charAt(2).toUpperCase() : 'G'}
+            </div>
             <div className="text-right leading-5">
               <div className="text-white text-lg md:text-xl font-semibold">
-                Big McDonalds
+                {userData?.userName || (account ? 'Guest' : 'Not connected')}
               </div>
               <div className="text-xs md:text-sm text-gray-500">
-                151210122027
+                {account ? `${account.slice(0, 6)}...${account.slice(-4)}` : 'Connect wallet'}
               </div>
             </div>
           </div>

@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "../components/sidebar.jsx";
 import assets from "../assets/assets.js";
+import { useWeb3 } from "../contexts/Web3Context";
+import { api } from "../services/api";
 import {
   Home,
   Flame,
@@ -20,11 +22,14 @@ import {
 } from "lucide-react";
 
 export default function SettingsPage() {
+  const { account } = useWeb3();
+  
   // --- Profile ---
-  const [fullName, setFullName] = useState("Will Smith");
-  const [username, setUsername] = useState("Big McDonalds");
-  const [email, setEmail] = useState("willmcd@gmail.com");
-  const [dob, setDob] = useState("1982-12-31");
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [dob, setDob] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // --- Security ---
   const [showPwd, setShowPwd] = useState(false);
@@ -33,16 +38,71 @@ export default function SettingsPage() {
   // --- Sidebar Toggle ---
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // --- Recent Logins ---
-  const logins = [
-    { date: "10/29/2025 10:23 AM", device: "Vizio Smart TV", status: "Confirmed" },
-    { date: "09/01/2025 9:13 PM", device: "Unknown Device", status: "Revoke" },
-  ];
+  // --- Recent Logins (simplified - backend doesn't provide this) ---
+  const [logins] = useState([
+    { date: new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }), device: "Current Session", status: "Confirmed" },
+  ]);
+
+  useEffect(() => {
+    if (account) {
+      fetchUserData();
+    } else {
+      setLoading(false);
+    }
+  }, [account]);
+
+  const fetchUserData = async () => {
+    if (!account) return;
+    setLoading(true);
+    try {
+      const response = await api.getUser(account);
+      const user = response.user || {};
+      
+      setUsername(user.userName || "");
+      setFullName(user.fullName || user.userName || "");
+      setEmail(user.email || "");
+      setDob(user.dateOfBirth || "");
+      setLoginAlerts(user.notifications !== false); // Default to true if not set
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // --- Backup for Cancel ---
-  const [backup] = useState({ fullName, username, email, dob, loginAlerts });
+  const [backup, setBackup] = useState({ fullName: "", username: "", email: "", dob: "", loginAlerts: true });
 
-  const handleSave = () => alert("Settings saved!");
+  useEffect(() => {
+    setBackup({ fullName, username, email, dob, loginAlerts });
+  }, [loading]); // Only set backup after initial load
+
+  const handleSave = async () => {
+    if (!account) {
+      alert("Please connect your wallet");
+      return;
+    }
+
+    try {
+      const updates = {
+        userName: username,
+        notifications: loginAlerts
+      };
+
+      // Only include fields that have values
+      if (fullName) updates.fullName = fullName;
+      if (email) updates.email = email;
+      if (dob) updates.dateOfBirth = dob;
+
+      await api.updateUser(account, updates);
+      setBackup({ fullName, username, email, dob, loginAlerts });
+      alert("Settings saved successfully!");
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      alert(`Failed to save settings: ${error.message}`);
+    }
+  };
+
   const handleCancel = () => {
     setFullName(backup.fullName);
     setUsername(backup.username);
@@ -87,16 +147,16 @@ export default function SettingsPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <img
-              src={assets.globe}
-              alt="avatar"
-              className="w-8 h-8 rounded-full border border-yellow-500"
-            />
+            <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-black font-bold text-sm border border-yellow-500">
+              {loading ? '...' : (username ? username.charAt(0).toUpperCase() : account ? account.charAt(2).toUpperCase() : 'G')}
+            </div>
             <div className="flex flex-col">
               <span className="text-sm font-medium truncate max-w-[120px] sm:max-w-[150px]">
-                Big McDonalds
+                {loading ? 'Loading...' : (username || (account ? 'Guest' : 'Not connected'))}
               </span>
-              <span className="text-xs opacity-70">13/01/2027</span>
+              <span className="text-xs opacity-70">
+                {account ? `${account.slice(0, 6)}...${account.slice(-4)}` : 'Connect wallet'}
+              </span>
             </div>
           </div>
         </header>
@@ -127,65 +187,71 @@ export default function SettingsPage() {
             </div>
 
             {/* Fields */}
-            {[
-              { icon: User, label: "Full Name", value: fullName, set: setFullName },
-              { icon: User, label: "Username", value: username, set: setUsername },
-              { icon: Mail, label: "Email Address", value: email, set: setEmail, type: "email" },
-              { icon: Calendar, label: "Date of Birth", value: dob, set: setDob, type: "date" },
-            ].map((f) => (
-              <div key={f.label} className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full">
-                <f.icon className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-                <div className="flex-1 w-full">
-                  <label className="block text-xs text-gray-400">{f.label}</label>
-                  <input
-                    type={f.type ?? "text"}
-                    value={f.value}
-                    onChange={(e) => f.set(e.target.value)}
-                    className="w-full bg-transparent border-b border-gray-700 text-white focus:outline-none focus:border-yellow-500 pb-1"
-                  />
+            {loading ? (
+              <div className="text-yellow-400 text-center py-4">Loading user data...</div>
+            ) : !account ? (
+              <div className="text-gray-400 text-center py-4">Please connect your wallet to view settings</div>
+            ) : (
+              [
+                { icon: User, label: "Full Name", value: fullName, set: setFullName, placeholder: "Enter full name" },
+                { icon: User, label: "Username", value: username, set: setUsername, placeholder: "Enter username", required: true },
+                { icon: Mail, label: "Email Address", value: email, set: setEmail, type: "email", placeholder: "Enter email (optional)" },
+                { icon: Calendar, label: "Date of Birth", value: dob, set: setDob, type: "date", placeholder: "Select date" },
+              ].map((f) => (
+                <div key={f.label} className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full">
+                  <f.icon className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                  <div className="flex-1 w-full">
+                    <label className="block text-xs text-gray-400">{f.label}{f.required && ' *'}</label>
+                    <input
+                      type={f.type ?? "text"}
+                      value={f.value}
+                      onChange={(e) => f.set(e.target.value)}
+                      placeholder={f.placeholder}
+                      className="w-full bg-transparent border-b border-gray-700 text-white focus:outline-none focus:border-yellow-500 pb-1 placeholder-gray-600"
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
 
             {/* Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <button
-                onClick={handleSave}
-                className="flex-1 py-2 bg-transparent border border-[#f7931a] rounded hover:bg-[#f7931a] hover:text-black transition"
-              >
-                Save Changes
-              </button>
-              <button
-                onClick={handleCancel}
-                className="flex-1 py-2 border border-[#f7931a] rounded text-yellow-500 hover:bg-[#f7931a] hover:text-black transition"
-              >
-                Cancel
-              </button>
-            </div>
+            {account && !loading && (
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <button
+                  onClick={handleSave}
+                  disabled={!username.trim()}
+                  className="flex-1 py-2 bg-transparent border border-[#f7931a] rounded hover:bg-[#f7931a] hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Changes
+                </button>
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 py-2 border border-[#f7931a] rounded text-yellow-500 hover:bg-[#f7931a] hover:text-black transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </section>
 
           {/* RIGHT PANEL */}
           <section className="bg-black p-5 sm:p-6 rounded-2xl border border-[#f7931a] space-y-6 shadow-lg">
             <h2 className="text-lg sm:text-xl font-semibold">Security Settings</h2>
 
-            {/* Password */}
+            {/* Password - Note: Wallet-based auth doesn't use passwords */}
             <div className="space-y-2">
-              <label className="block text-sm text-gray-400">Password</label>
+              <label className="block text-sm text-gray-400">Authentication</label>
               <div className="relative">
                 <input
-                  type={showPwd ? "text" : "password"}
-                  value="••••••••"
+                  type="text"
+                  value={account ? `Wallet: ${account.slice(0, 6)}...${account.slice(-4)}` : "Not connected"}
                   readOnly
                   className="w-full bg-transparent border-b border-gray-700 text-white pb-1 pr-10"
                 />
-                <button
-                  onClick={() => setShowPwd(!showPwd)}
-                  className="absolute right-0 top-1 text-gray-400 hover:text-yellow-500 transition"
-                >
-                  {showPwd ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
               </div>
-              <button className="text-sm hover:text-yellow-400">Change Password</button>
+              <p className="text-xs text-gray-500 mt-1">
+                Your wallet signature is used for authentication. No password required.
+              </p>
             </div>
 
             {/* Login Alerts Toggle */}

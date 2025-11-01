@@ -4,8 +4,10 @@ import SupportForm from "./SupportForm";
 import Sidebar from "../sidebar";
 import assets from "../../assets/assets";
 import { Menu, X } from "lucide-react";
+import { useWeb3 } from "../../contexts/Web3Context";
+import { api } from "../../services/api";
 
-const Topbar = ({ sidebarOpen, setSidebarOpen }) => {
+const Topbar = ({ sidebarOpen, setSidebarOpen, userData, account }) => {
   return (
     <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-900 w-full">
       <div className="flex items-center gap-3">
@@ -21,14 +23,16 @@ const Topbar = ({ sidebarOpen, setSidebarOpen }) => {
         </span>
       </div>
       <div className="flex items-center gap-3 text-sm text-gray-400">
-        <img
-          src={assets.profile}
-          alt="Profile"
-          className="w-10 h-10 rounded-full object-cover border border-yellow-600/50"
-        />
+        <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center text-black font-bold border border-yellow-600/50">
+          {userData?.userName ? userData.userName.charAt(0).toUpperCase() : account ? account.charAt(2).toUpperCase() : 'G'}
+        </div>
         <div className="text-right">
-          <div className="text-white text-base">Big McDonalds</div>
-          <div className="text-xs md:text-sm text-gray-500">151210122027</div>
+          <div className="text-white text-base">
+            {userData?.userName || (account ? 'Guest' : 'Not connected')}
+          </div>
+          <div className="text-xs md:text-sm text-gray-500">
+            {account ? `${account.slice(0, 6)}...${account.slice(-4)}` : 'Connect wallet'}
+          </div>
         </div>
       </div>
     </div>
@@ -36,14 +40,32 @@ const Topbar = ({ sidebarOpen, setSidebarOpen }) => {
 };
 
 const SupportPage = () => {
+  const { account } = useWeb3();
   const [_, setTick] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userData, setUserData] = useState(null);
 
   useEffect(() => {
     const onHash = () => setTick((t) => t + 1);
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+
+  useEffect(() => {
+    if (account) {
+      fetchUserData();
+    }
+  }, [account]);
+
+  const fetchUserData = async () => {
+    if (!account) return;
+    try {
+      const response = await api.getUser(account);
+      setUserData(response.user);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-black text-white font-poppins flex flex-col md:flex-row w-full">
@@ -66,7 +88,7 @@ const SupportPage = () => {
 
       {/* Main content */}
       <div className="flex-1 min-h-screen flex flex-col w-full">
-        <Topbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+        <Topbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} userData={userData} account={account} />
         <div className="flex-1 w-full px-2 md:px-6 py-3">
           <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-6 h-full">
             <div className="w-full h-full p-2 md:p-4">

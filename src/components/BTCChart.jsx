@@ -44,28 +44,46 @@ const BTCChart = () => {
       else if (activeTab === 'all') days = 365;
 
       const response = await api.getMarketChart('btc', days);
+      console.log('Chart response:', response);
       
-      if (response.prices && Array.isArray(response.prices)) {
+      if (response && response.prices && Array.isArray(response.prices) && response.prices.length > 0) {
         const formatted = response.prices.map((item) => ({
           time: '',
-          price: item.price || 0
-        }));
+          price: typeof item === 'object' && item.price !== undefined 
+            ? Number(item.price) 
+            : typeof item === 'number' 
+            ? item 
+            : Number(item) || 0
+        })).filter(item => item.price > 0); // Filter out invalid prices
+        
+        console.log('Formatted chart data:', formatted);
         
         // Calculate price change
         if (formatted.length > 1) {
           const firstPrice = formatted[0].price;
           const lastPrice = formatted[formatted.length - 1].price;
-          const change = ((lastPrice - firstPrice) / firstPrice) * 100;
-          const changePercent = change >= 0 ? `+${change.toFixed(2)}%` : `${change.toFixed(2)}%`;
-          setPriceChange(changePercent);
+          if (firstPrice > 0) {
+            const change = ((lastPrice - firstPrice) / firstPrice) * 100;
+            const changePercent = change >= 0 ? `+${change.toFixed(2)}%` : `${change.toFixed(2)}%`;
+            setPriceChange(changePercent);
+          }
         }
         
-        setChartData(formatted);
+        if (formatted.length > 0) {
+          setChartData(formatted);
+        } else {
+          console.warn('No valid chart data points found');
+          setChartData([]);
+        }
+      } else {
+        console.warn('Invalid or empty chart response:', response);
+        setChartData([]);
       }
     } catch (error) {
       console.error('Error fetching chart data:', error);
       // Fallback to empty data on error
       setChartData([]);
+      setPriceChange('0%');
     } finally {
       setLoading(false);
     }
@@ -117,10 +135,17 @@ const BTCChart = () => {
           <div className="h-[220px] flex items-center justify-center text-yellow-400">
             Loading chart data...
           </div>
+        ) : chartData.length === 0 ? (
+          <div className="h-[220px] flex flex-col items-center justify-center text-yellow-400">
+            <div>No chart data available</div>
+            <div className="text-sm text-gray-500 mt-2">
+              {activeTab === '1H' ? 'Try selecting 1D, 1W, or 1M' : 'Data may be temporarily unavailable'}
+            </div>
+          </div>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart
-              data={chartData.length > 0 ? chartData : [{ time: '', price: 0 }]}
+              data={chartData}
               margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
             >
             <defs>
