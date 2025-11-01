@@ -350,28 +350,33 @@ Try: Check browser console for more details, or verify server is running.`);
 
   /**
    * Get pool by invite ID
-   * @param {string} inviteId - Pool invite link ID
+   * Since backend doesn't have /pools/invite/:inviteId endpoint,
+   * we fetch all pools and search for one with matching inviteLink
+   * @param {string} inviteId - Pool invite link ID (the part after /pools/)
    */
   async getPoolByInviteId(inviteId) {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      // Fetch all pools and search for the one with matching inviteLink
+      const response = await this.getPools();
       
-      const response = await fetch(`${API_BASE_URL}/pools/invite/${inviteId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch pool');
+      if (!response.pools || !Array.isArray(response.pools)) {
+        throw new Error('Invalid pools response');
       }
 
-      return await response.json();
+      // Search for pool where inviteLink ends with the inviteId
+      // inviteLink format: ${CORS_ORIGIN}/pools/${inviteId}
+      const pool = response.pools.find(p => {
+        if (!p.inviteLink) return false;
+        // Extract ID from inviteLink (last part after /)
+        const linkId = p.inviteLink.split('/').pop();
+        return linkId === inviteId;
+      });
+
+      if (!pool) {
+        throw new Error('Pool not found with invite ID: ' + inviteId);
+      }
+
+      return { pool };
     } catch (error) {
       console.error('Get pool by invite error:', error);
       throw error;
