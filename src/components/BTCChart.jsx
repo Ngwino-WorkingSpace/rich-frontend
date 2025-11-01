@@ -23,7 +23,7 @@ const BTCChart = () => {
 
   const fetchCurrentPrice = async () => {
     try {
-      const response = await api.getPrice('btc');
+      const response = await api.getPrice('BTC'); // Backend expects uppercase
       if (response.priceUSD) {
         const price = response.priceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         setCurrentPrice(price);
@@ -43,7 +43,7 @@ const BTCChart = () => {
       else if (activeTab === '1H') days = 1;
       else if (activeTab === 'all') days = 365;
 
-      const response = await api.getMarketChart('btc', days);
+      const response = await api.getMarketChart('BTC', days); // Backend expects uppercase
       console.log('Chart response:', response);
       
       if (response && response.prices && Array.isArray(response.prices) && response.prices.length > 0) {

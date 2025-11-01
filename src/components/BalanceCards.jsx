@@ -39,7 +39,7 @@ const BalanceCard = () => {
           const ethAmount = parseFloat(ethers.formatEther(ethBalance));
           
           // Fetch ETH price
-          const ethPriceResponse = await api.getPrice('eth');
+          const ethPriceResponse = await api.getPrice('ETH'); // Backend expects uppercase
           const ethPrice = ethPriceResponse.priceUSD || 2700;
           const ethValue = ethAmount * ethPrice;
           
@@ -64,7 +64,7 @@ const BalanceCard = () => {
           const pools = userResponse.user?.joinedPools || [];
           
           // Fetch BTC price
-          const btcPriceResponse = await api.getPrice('btc');
+          const btcPriceResponse = await api.getPrice('BTC'); // Backend expects uppercase
           const btcPrice = btcPriceResponse.priceUSD || 68350;
           
           let totalBTCValue = 0;

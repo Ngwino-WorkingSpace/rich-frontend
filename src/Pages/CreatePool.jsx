@@ -198,11 +198,11 @@ const CreatePool = () => {
                 onChange={handleInputChange}
                 className="w-full bg-black/60 border border-yellow-400 rounded-md px-7 py-3 mb-3 text-yellow-200 outline-none focus:ring-2 focus:ring-yellow-300 text-lg font-poppins"
               >
-                <option value="1">1 year</option>
-                <option value="2">2 years</option>
-                <option value="3">3 years</option>
-                <option value="4">4 years</option>
-                <option value="5">5 years</option>
+                <option value="1">1 month</option>
+                <option value="2">2 months</option>
+                <option value="3">3 months</option>
+                <option value="4">6 months</option>
+                <option value="5">9 months</option>
               </select>
 
             </div>

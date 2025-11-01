@@ -17,21 +17,21 @@ const coinsConfig = [
     rank: 1,
     name: 'Bitcoin',
     symbol: 'BTC',
-    apiSymbol: 'btc',
+    apiSymbol: 'BTC', // Backend expects uppercase
     logo: BitcoinLogo,
   },
   {
     rank: 2,
     name: 'Ethereum',
     symbol: 'ETH',
-    apiSymbol: 'eth',
+    apiSymbol: 'ETH', // Backend expects uppercase
     logo: EthereumLogo,
   },
   {
     rank: 3,
     name: 'Tether',
     symbol: 'USDT',
-    apiSymbol: 'usdt',
+    apiSymbol: 'USDT', // Backend expects uppercase
     logo: TetherLogo,
     fallbackPrice: 1.0, // Stablecoin, usually $1
   },
@@ -39,21 +39,21 @@ const coinsConfig = [
     rank: 4,
     name: 'Binance Coin',
     symbol: 'BNB',
-    apiSymbol: 'bnb',
+    apiSymbol: 'BNB', // Backend expects uppercase
     logo: BinanceLogo,
   },
   {
     rank: 5,
     name: 'XRP',
     symbol: 'XRP',
-    apiSymbol: 'xrp',
+    apiSymbol: 'XRP', // Backend expects uppercase
     logo: XRRLogo,
   },
   {
     rank: 6,
     name: 'Cardano',
     symbol: 'ADA',
-    apiSymbol: 'ada',
+    apiSymbol: 'ADA', // Backend expects uppercase
     logo: CardanoLogo,
   },
 ];
@@ -90,19 +90,8 @@ export default function Market() {
     setLoading(true);
     try {
       const coinDataPromises = coinsConfig.map(async (coinConfig) => {
-        // Only fetch prices for BTC and ETH (supported by backend)
-        // For other coins, use fallback or show N/A
-        if (coinConfig.apiSymbol !== 'btc' && coinConfig.apiSymbol !== 'eth' && !coinConfig.fallbackPrice) {
-          return {
-            ...coinConfig,
-            price: 'N/A',
-            change24h: 'N/A',
-            priceUSD: 0,
-            marketCap: 'N/A',
-            volume: 'N/A',
-          };
-        }
-
+        // Backend supports: BTC, ETH, USDT, BNB, XRP, ADA
+        // All configured coins are supported, so we try to fetch all
         try {
           const response = await api.getPrice(coinConfig.apiSymbol);
           console.log(`Price response for ${coinConfig.name} (${coinConfig.apiSymbol}):`, response);
@@ -113,13 +102,18 @@ export default function Market() {
             throw new Error(response.error);
           }
           
-          // Extract price from response - backend should return { coin, priceUSD, source }
+          // Extract price from response - backend returns { coin, priceUSD, source }
           let priceUSD = response.priceUSD || response.price || 0;
           
           // Validate price is a number
           if (typeof priceUSD !== 'number' || isNaN(priceUSD) || priceUSD <= 0) {
             console.warn(`Invalid price for ${coinConfig.name}:`, priceUSD);
-            throw new Error(`Invalid price: ${priceUSD}`);
+            // Use fallback if available, otherwise throw
+            if (coinConfig.fallbackPrice) {
+              priceUSD = coinConfig.fallbackPrice;
+            } else {
+              throw new Error(`Invalid price: ${priceUSD}`);
+            }
           }
           
           // Only calculate change if we have a valid price

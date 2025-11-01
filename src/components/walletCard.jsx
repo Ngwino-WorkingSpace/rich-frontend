@@ -32,7 +32,7 @@ const WalletCard = () => {
           const ethAmount = parseFloat(ethers.formatEther(ethBalance));
           
           if (ethAmount > 0) {
-            const ethPriceResponse = await api.getPrice('eth');
+            const ethPriceResponse = await api.getPrice('ETH'); // Backend expects uppercase
             const ethPrice = ethPriceResponse.priceUSD || 2700;
             const ethValue = ethAmount * ethPrice;
             
@@ -56,7 +56,7 @@ const WalletCard = () => {
           const pools = userResponse.user?.joinedPools || [];
           
           // Get BTC price
-          const btcPriceResponse = await api.getPrice('btc');
+          const btcPriceResponse = await api.getPrice('BTC'); // Backend expects uppercase
           const btcPrice = btcPriceResponse.priceUSD || 68350;
           
           // Group by coin type

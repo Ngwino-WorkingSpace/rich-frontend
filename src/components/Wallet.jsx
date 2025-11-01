@@ -30,7 +30,7 @@ const Wallet = () => {
 
       // Fetch BTC price
       try {
-        const priceResponse = await api.getPrice('btc');
+        const priceResponse = await api.getPrice('BTC'); // Backend expects uppercase
         setBtcPrice(priceResponse.priceUSD);
       } catch (error) {
         console.error('Error fetching BTC price:', error);
