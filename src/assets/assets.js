@@ -11,7 +11,7 @@ import timer from './timer.png';
 import whatsapp from './tsap.png';
 import earth from './earth.png';
 import link from './link.png';
-import bitcoin from './bitcoin.png';
+import bitcoin from './Bitcoin.png';
 import save from './save.png'
 import map from './map.png'
 import dollar from './dollar.png'
