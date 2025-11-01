@@ -40,7 +40,7 @@ function LoginSignUp() {
         const healthController = new AbortController();
         const healthTimeout = setTimeout(() => healthController.abort(), 15000); // 15 second timeout for health check
         
-        const healthCheck = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://rich-off-chain-backend.onrender.com/api'}/pools`, {
+        const healthCheck = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://rich-off-chain-backend-1.onrender.com/api'}/pools`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           signal: healthController.signal,
@@ -97,7 +97,7 @@ function LoginSignUp() {
 
       // Log complete request data for debugging
       console.log('=== LOGIN REQUEST DATA ===');
-      console.log('API URL:', import.meta.env.VITE_API_BASE_URL || 'https://rich-off-chain-backend.onrender.com/api');
+      console.log('API URL:', import.meta.env.VITE_API_BASE_URL || 'https://rich-off-chain-backend-1.onrender.com/api');
       console.log('Wallet:', walletAddress);
       console.log('Message length:', message.length);
       console.log('Message:', message);
@@ -141,7 +141,7 @@ The server took too long to respond (60 seconds).
    3. Subsequent requests will be faster
 
 💡 Tip: Try accessing the API directly to wake it up:
-   ${import.meta.env.VITE_API_BASE_URL || 'https://rich-off-chain-backend.onrender.com/api'}/pools
+   ${import.meta.env.VITE_API_BASE_URL || 'https://rich-off-chain-backend-1.onrender.com/api'}/pools
 
 📊 Check browser console (F12) for more details`;
       }
@@ -150,7 +150,7 @@ The server took too long to respond (60 seconds).
       if (errorMessage.includes("Network error") || errorMessage.includes("fetch") || errorMessage.includes("Cannot connect")) {
         errorMessage = `🌐 Connection Failed
 
-Cannot connect to: ${import.meta.env.VITE_API_BASE_URL || 'https://rich-off-chain-backend.onrender.com/api'}
+Cannot connect to: ${import.meta.env.VITE_API_BASE_URL || 'https://rich-off-chain-backend-1.onrender.com/api'}
 
 Possible causes:
 1. Backend server is sleeping (Render free tier) - wait 30-60 seconds
@@ -160,7 +160,7 @@ Possible causes:
 
 What to do:
 • Check browser console (F12) for detailed error
-• Try accessing: https://rich-off-chain-backend.onrender.com/api/pools in your browser
+• Try accessing: https://rich-off-chain-backend-1.onrender.com/api/pools in your browser
 • Wait 30-60 seconds and retry (Render free tier takes time to wake up)
 • Verify backend is running if using localhost`;
       }

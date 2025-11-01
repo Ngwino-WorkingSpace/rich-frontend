@@ -25,7 +25,7 @@ export const checkApiHealth = async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://rich-off-chain-backend.onrender.com/api'}/user/login`, {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://rich-off-chain-backend-1.onrender.com/api'}/user/login`, {
       method: 'OPTIONS',
       signal: controller.signal,
     });

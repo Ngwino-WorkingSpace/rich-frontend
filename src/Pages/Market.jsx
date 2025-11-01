@@ -1,91 +1,88 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../components/sidebar';
 import BitcoinLogo from '../assets/Bitcoin.png';
 import EthereumLogo from '../assets/Ethereum.png';
-import MetamaskLogo from '../assets/Metamask.png';
-import TetherLogo from '../assets/Tether.png';
-import CardanoLogo from '../assets/Cardano.png';
-import XRRLogo from '../assets/XRR.png';
-import BinanceLogo from '../assets/Binance.png';
 import { ChevronDown, Tv, Menu, X } from 'lucide-react';
+import { api } from '../services/api';
+import { useWeb3 } from '../contexts/Web3Context';
 
-const coins = [
+const coinsConfig = [
   {
     rank: 1,
     name: 'Bitcoin',
     symbol: 'BTC',
-    price: '$41,285.55',
-    change24h: '+1.43%',
-    marketCap: '$835.49B',
-    volume: '$31.39B',
+    apiSymbol: 'btc',
     logo: BitcoinLogo,
   },
   {
     rank: 2,
-    name: 'MetaMask',
-    symbol: 'META',
-    price: '$39,285.55',
-    change24h: '+1.36%',
-    marketCap: '$795.91B',
-    volume: '$26.02B',
-    logo: MetamaskLogo,
-  },
-  {
-    rank: 3,
     name: 'Ethereum',
     symbol: 'ETH',
-    price: '$2,725.32',
-    change24h: '-0.39%',
-    marketCap: '$327.61B',
-    volume: '$16.87B',
+    apiSymbol: 'eth',
     logo: EthereumLogo,
-  },
-  {
-    rank: 4,
-    name: 'Tether',
-    symbol: 'USDT',
-    price: '$1.0001',
-    change24h: '-0.44%',
-    marketCap: '$81.32B',
-    volume: '$5.17B',
-    logo: TetherLogo,
-  },
-  {
-    rank: 5,
-    name: 'Binance Coin',
-    symbol: 'BNB',
-    price: '$393.05',
-    change24h: '-1.18%',
-    marketCap: '$50.29B',
-    volume: '$2.44B',
-    logo: BinanceLogo,
-  },
-  {
-    rank: 6,
-    name: 'XRP',
-    symbol: 'XRP',
-    price: '$0.7158',
-    change24h: '-1.59%',
-    marketCap: '$37.33B',
-    volume: '$1.87B',
-    logo: XRRLogo,
-  },
-  {
-    rank: 7,
-    name: 'Cardano',
-    symbol: 'ADA',
-    price: '$0.3011',
-    change24h: '-0.56%',
-    marketCap: '$13.26B',
-    volume: '$938.22M',
-    logo: CardanoLogo,
   },
 ];
 
 export default function Market() {
+  const { account } = useWeb3();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [coins, setCoins] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [prevPrices, setPrevPrices] = useState({});
+
+  useEffect(() => {
+    fetchCoinPrices();
+    // Refresh prices every 30 seconds
+    const interval = setInterval(fetchCoinPrices, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchCoinPrices = async () => {
+    setLoading(true);
+    try {
+      const coinDataPromises = coinsConfig.map(async (coinConfig) => {
+        try {
+          const response = await api.getPrice(coinConfig.apiSymbol);
+          const priceUSD = response.priceUSD || 0;
+          const prevPrice = prevPrices[coinConfig.symbol] || priceUSD;
+          
+          // Calculate 24h change (simplified - in production, backend should provide this)
+          const change = prevPrice > 0 ? ((priceUSD - prevPrice) / prevPrice) * 100 : 0;
+          const change24h = change >= 0 ? `+${change.toFixed(2)}%` : `${change.toFixed(2)}%`;
+          
+          // Store current price for next calculation
+          setPrevPrices(prev => ({ ...prev, [coinConfig.symbol]: priceUSD }));
+          
+          return {
+            ...coinConfig,
+            price: `$${priceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            change24h,
+            priceUSD, // Store raw price for sorting
+            marketCap: 'N/A', // Backend doesn't provide market cap
+            volume: 'N/A', // Backend doesn't provide volume
+          };
+        } catch (error) {
+          console.error(`Error fetching ${coinConfig.name} price:`, error);
+          return {
+            ...coinConfig,
+            price: 'N/A',
+            change24h: '0%',
+            marketCap: 'N/A',
+            volume: 'N/A',
+          };
+        }
+      });
+
+      const fetchedCoins = await Promise.all(coinDataPromises);
+      setCoins(fetchedCoins);
+    } catch (error) {
+      console.error('Error fetching coin prices:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col md:flex-row transition-all duration-300">
@@ -143,8 +140,12 @@ export default function Market() {
           </h2>
 
           {/* Cards Section */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {coins.map((coin) => (
+          {loading ? (
+            <div className="text-yellow-400 text-center py-8">Loading market data...</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                {coins.map((coin) => (
               <div key={coin.rank} className="bg-black border border-yellow-500 rounded-xl p-4">
                 <div className="flex items-center mb-2">
                   {coin.logo && <img src={coin.logo} alt={coin.name} className="w-6 h-6 mr-2" />}
@@ -155,11 +156,11 @@ export default function Market() {
                   {coin.change24h}
                 </div>
               </div>
-            ))}
-          </div>
+                ))}
+              </div>
 
-          {/* Table Section */}
-          <div className="bg-black border border-yellow-500 rounded-xl overflow-x-auto">
+              {/* Table Section */}
+              <div className="bg-black border border-yellow-500 rounded-xl overflow-x-auto">
             <table className="w-full min-w-[600px]">
               <thead>
                 <tr className="text-yellow-500 text-left">
@@ -201,6 +202,8 @@ export default function Market() {
               </tbody>
             </table>
           </div>
+            </>
+          )}
         </div>
       </div>
 

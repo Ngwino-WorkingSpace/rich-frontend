@@ -6,7 +6,7 @@ const getApiBaseUrl = () => {
   }
   
   // Fallback to production
-  return 'https://rich-off-chain-backend.onrender.com/api';
+  return 'https://rich-off-chain-backend-1.onrender.com/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();

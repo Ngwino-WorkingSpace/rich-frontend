@@ -1,67 +1,95 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { api } from '../services/api';
 
 const BTCChart = () => {
-  
-  const data = [
-    { time: '', price: 71500 },  
-    { time: '', price: 70800 },   
-    { time: '', price: 71200 },   
-    { time: '', price: 70500 },   
-    { time: '', price: 70900 },  
-    { time: '', price: 80200 },
-    { time: '', price: 75600 },   
-    { time: '', price: 69800 }, 
-    { time: '', price: 74500 }, 
-    { time: '', price: 69200 },  
-    { time: '', price: 68800 },   
-    { time: '', price: 68500 },  
-    { time: '', price: 68000 },   
-    { time: '', price: 67500 },   
-    { time: '', price: 67000 },
-    { time: '', price: 66500 },   
-    { time: '', price: 68000 },   
-    { time: '', price: 65500 }, 
-    { time: '', price: 65000 },   
-    { time: '', price: 64500 },   
-    { time: '', price: 64000 },   
-    { time: '', price: 64800 },   
-    { time: '', price: 64200 },   
-    { time: '', price: 65500 },   
-    { time: '', price: 65000 },  
-    { time: '', price: 66200 },   
-    { time: '', price: 65800 },   
-    { time: '', price: 66500 },   
-    { time: '', price: 66000 },   
-    { time: '', price: 67000 },   
-    { time: '', price: 67500 }, 
-    { time: '', price: 68000 },   
-    { time: '', price: 69000 },   
-    { time: '', price: 70000 },   
-    { time: '', price: 68500 },   
-    { time: '', price: 69500 },   
-    { time: '', price: 67500 },   
-    { time: '', price: 70000 },  
-    { time: '', price: 69000 },  
-    { time: '', price: 72500 },   
-    { time: '', price: 70500 },  
-    { time: '', price: 74000 },   
-    { time: '', price: 71500 },   
-    { time: '', price: 68000 },  
-  ];
-
+  const [chartData, setChartData] = useState([]);
+  const [currentPrice, setCurrentPrice] = useState('68,320.00');
+  const [priceChange, setPriceChange] = useState('+27.8%');
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('1D');
   const timeTabs = ['1H', 'all', '1D', '1W', '1M'];
-  const activeTab = '1D';
+
+  useEffect(() => {
+    fetchChartData();
+    fetchCurrentPrice();
+    
+    // Refresh price every 30 seconds
+    const priceInterval = setInterval(fetchCurrentPrice, 30000);
+    
+    return () => clearInterval(priceInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const fetchCurrentPrice = async () => {
+    try {
+      const response = await api.getPrice('btc');
+      if (response.priceUSD) {
+        const price = response.priceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        setCurrentPrice(price);
+      }
+    } catch (error) {
+      console.error('Error fetching BTC price:', error);
+    }
+  };
+
+  const fetchChartData = async () => {
+    setLoading(true);
+    try {
+      let days = 7; // Default to 1 week
+      if (activeTab === '1D') days = 1;
+      else if (activeTab === '1W') days = 7;
+      else if (activeTab === '1M') days = 30;
+      else if (activeTab === '1H') days = 1;
+      else if (activeTab === 'all') days = 365;
+
+      const response = await api.getMarketChart('btc', days);
+      
+      if (response.prices && Array.isArray(response.prices)) {
+        const formatted = response.prices.map((item) => ({
+          time: '',
+          price: item.price || 0
+        }));
+        
+        // Calculate price change
+        if (formatted.length > 1) {
+          const firstPrice = formatted[0].price;
+          const lastPrice = formatted[formatted.length - 1].price;
+          const change = ((lastPrice - firstPrice) / firstPrice) * 100;
+          const changePercent = change >= 0 ? `+${change.toFixed(2)}%` : `${change.toFixed(2)}%`;
+          setPriceChange(changePercent);
+        }
+        
+        setChartData(formatted);
+      }
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+      // Fallback to empty data on error
+      setChartData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Calculate chart domain dynamically
+  const prices = chartData.map(d => d.price).filter(p => p > 0);
+  const minPrice = prices.length > 0 ? Math.min(...prices) * 0.95 : 0;
+  const maxPrice = prices.length > 0 ? Math.max(...prices) * 1.05 : 100000;
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+  };
 
   return (
     <div className="bg-black border border-gray-700 rounded-none p-4 shadow-[0_0_20px_rgba(250,204,21,0.05)] flex flex-col font-poppins">
       
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-baseline gap-3">
-          <h2 className="text-white text-3xl font-bold tracking-wide">BTC = 68,320.00</h2>
+          <h2 className="text-white text-3xl font-bold tracking-wide">BTC = ${currentPrice}</h2>
           <div className="flex items-center gap-1">
-            <span className="text-green-400 font-semibold text-base">+27.8%</span>
-            <span className="text-green-400 text-sm">(0.73%)</span>
+            <span className={`font-semibold text-base ${priceChange.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}>
+              {priceChange}
+            </span>
           </div>
         </div>
 
@@ -70,6 +98,7 @@ const BTCChart = () => {
           {timeTabs.map((tab) => (
             <button
               key={tab}
+              onClick={() => handleTabChange(tab)}
               className={`text-sm uppercase tracking-wide px-2 py-0.5 rounded-sm transition-colors ${
                 tab === activeTab
                   ? 'text-black bg-yellow-400'
@@ -84,11 +113,16 @@ const BTCChart = () => {
 
    
       <div className="relative overflow-hidden">
-        <ResponsiveContainer width="100%" height={220}>
-          <AreaChart
-            data={data}
-            margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-          >
+        {loading ? (
+          <div className="h-[220px] flex items-center justify-center text-yellow-400">
+            Loading chart data...
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart
+              data={chartData.length > 0 ? chartData : [{ time: '', price: 0 }]}
+              margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
+            >
             <defs>
               <linearGradient id="btcChartFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#facc15" stopOpacity={0.45} />
@@ -126,7 +160,7 @@ const BTCChart = () => {
             />
 
             <YAxis
-              domain={[63500, 81000]}
+              domain={[minPrice, maxPrice]}
               hide={true}
             />
 
@@ -171,6 +205,7 @@ const BTCChart = () => {
             </g>
           </AreaChart>
         </ResponsiveContainer>
+        )}
 
         <div
           className="absolute bottom-0 left-0 right-0 h-8 pointer-events-none"

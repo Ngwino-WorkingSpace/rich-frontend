@@ -33,9 +33,6 @@ function Dashboard() {
           </div>
 
           {/* Top Nav (Desktop) */}
-          <div className="hidden md:block">
-            <Nav />
-          </div>
 
           {/* Main Layout */}
           <main className="flex flex-col lg:flex-row flex-1 w-full min-w-0 px-4 md:px-6 py-6 gap-6 overflow-x-hidden">

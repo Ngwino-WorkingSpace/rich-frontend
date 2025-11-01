@@ -1,18 +1,76 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, Eye } from "lucide-react";
+import { useWeb3 } from "../contexts/Web3Context";
+import { api } from "../services/api";
+import { ethers } from "ethers";
 
 const TransactionsCard = () => {
+  const { account, provider } = useWeb3();
   const [currentPage, setCurrentPage] = useState(1);
-  const availableBalance = 82326.23;
+  const [transactions, setTransactions] = useState([]);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const transactions = [
-    { id: 1, coin: "USDT", date: "20/08/24", amount: 3000, status: "success" },
-    { id: 2, coin: "BTC", date: "20/08/24", amount: 5000, status: "success" },
-    { id: 3, coin: "ETH", date: "20/08/24", amount: 1000, status: "success" },
-    { id: 4, coin: "USDC", date: "20/08/24", amount: 500, status: "pending" },
-    { id: 5, coin: "CARDANO", date: "20/08/24", amount: 250, status: "success" },
-    { id: 6, coin: "USDT", date: "20/08/24", amount: 1500, status: "success" },
-  ];
+  useEffect(() => {
+    if (account) {
+      fetchTransactions();
+      fetchBalance();
+    } else {
+      setLoading(false);
+    }
+  }, [account, provider]);
+
+  const fetchTransactions = async () => {
+    if (!account) return;
+    
+    setLoading(true);
+    try {
+      const response = await api.getTransactions(account);
+      const txs = response.txs || [];
+      
+      // Map transactions to display format
+      const mappedTxs = txs.map((tx, index) => {
+        const date = new Date(tx.createdAt || tx.created);
+        const formattedDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        
+        // Determine coin type based on transaction context (simplified)
+        const coin = tx.type === 'buy' || tx.type === 'deposit' ? 'BTC' : 'ETH';
+        
+        // Determine status
+        const status = tx.type === 'refund' ? 'pending' : 'success';
+        
+        return {
+          id: tx._id || index,
+          coin,
+          date: formattedDate,
+          amount: tx.amount || 0,
+          status,
+          txHash: tx.txHash
+        };
+      });
+      
+      setTransactions(mappedTxs);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      setTransactions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBalance = async () => {
+    if (!provider || !account) return;
+    
+    try {
+      const balance = await provider.getBalance(account);
+      const ethBalance = parseFloat(ethers.formatEther(balance));
+      const ethPrice = 2700; // Approximate ETH price
+      const usdBalance = ethBalance * ethPrice;
+      setAvailableBalance(usdBalance);
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+    }
+  };
 
   const itemsPerPage = 3;
   const totalPages = Math.ceil(transactions.length / itemsPerPage);
@@ -140,7 +198,14 @@ const TransactionsCard = () => {
   </div>
 
   <div className="space-y-3">
-    {displayedTransactions.map((tx, index) => {
+    {loading ? (
+      <div className="text-center text-yellow-400 py-4">Loading transactions...</div>
+    ) : transactions.length === 0 ? (
+      <div className="text-center text-gray-400 py-4">
+        {account ? 'No transactions found' : 'Please connect your wallet'}
+      </div>
+    ) : (
+      displayedTransactions.map((tx, index) => {
       const { icon: StatusIcon, bg, text, iconColor } = getStatusIconAndColor(tx.status);
       return (
         <div
@@ -168,7 +233,8 @@ const TransactionsCard = () => {
           </div>
         </div>
       );
-    })}
+    })
+    )}
   </div>
 </div>
 
